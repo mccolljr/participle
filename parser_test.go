@@ -1712,3 +1712,50 @@ func TestEmptySequenceMatches(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 }
+
+type ParsedIface interface{ isParsedIface() }
+
+type ParseMeA struct{ S string }
+type ParseMeB struct{ I int64 }
+
+func (ParseMeA) isParsedIface() {}
+func (ParseMeB) isParsedIface() {}
+
+func parseParsedIface(l *lexer.PeekingLexer) (ParsedIface, error) {
+	if l.Peek().Type == -3 {
+		s, err := strconv.Unquote(l.Next().Value)
+		if err != nil {
+			return nil, err
+		}
+		return ParseMeA{S: s}, nil
+	}
+	if l.Peek().Type == -2 {
+		i, err := strconv.ParseInt(l.Next().Value, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		return ParseMeB{I: i}, nil
+	}
+	return nil, participle.NextMatch
+}
+
+func TestParseWithInterface(t *testing.T) {
+	lex := lexer.MustSimple([]lexer.SimpleRule{
+		{"Number", `[1-9][0-9]*`},
+		{"String", `"[^"$]*"`},
+		{"Space", `[ \t\n]+`},
+	})
+	type subitem struct {
+		A ParsedIface `@@`
+		B bool        `| @Space`
+	}
+	type grammar struct {
+		Prods []subitem `@@*`
+	}
+	p := mustTestParser(t, &grammar{}, participle.Lexer(lex), participle.UseInterface(parseParsedIface))
+	actual := grammar{}
+	expected := grammar{Prods: []subitem{{A: ParseMeB{I: 123}}, {B: true}, {A: ParseMeA{S: "abc"}}}}
+	err := p.ParseString("", `123    "abc"`, &actual)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
+}

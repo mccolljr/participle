@@ -14,12 +14,19 @@ type generatorContext struct {
 	symbolsToIDs map[lexer.TokenType]string
 }
 
-func newGeneratorContext(lex lexer.Definition) *generatorContext {
-	return &generatorContext{
+func newGeneratorContext(lex lexer.Definition, ifaceParsers map[reflect.Type]reflect.Value) *generatorContext {
+	ctx := &generatorContext{
 		Definition:   lex,
 		typeNodes:    map[reflect.Type]node{},
 		symbolsToIDs: lexer.SymbolsByRune(lex),
 	}
+	for typ, parseFn := range ifaceParsers {
+		ctx.typeNodes[typ] = &iface{
+			typ:     typ,
+			parseFn: parseFn,
+		}
+	}
+	return ctx
 }
 
 // Takes a type and builds a tree of nodes out of it.

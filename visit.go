@@ -43,6 +43,8 @@ func visit(n node, visitor func(n node, next func() error) error) error {
 			return visit(n.expr, visitor)
 		case *lookaheadGroup:
 			return visit(n.expr, visitor)
+		case *iface:
+			return nil
 		default:
 			panic(fmt.Sprintf("%T", n))
 		}

@@ -12,14 +12,15 @@ import (
 
 // A Parser for a particular grammar and lexer.
 type Parser struct {
-	root            node
-	trace           io.Writer
-	lex             lexer.Definition
-	typ             reflect.Type
-	useLookahead    int
-	caseInsensitive map[string]bool
-	mappers         []mapperByToken
-	elide           []string
+	root             node
+	trace            io.Writer
+	lex              lexer.Definition
+	typ              reflect.Type
+	useLookahead     int
+	caseInsensitive  map[string]bool
+	mappers          []mapperByToken
+	elide            []string
+	interfaceParsers map[reflect.Type]reflect.Value
 }
 
 // MustBuild calls Build(grammar, options...) and panics if an error occurs.
@@ -40,9 +41,10 @@ func MustBuild(grammar interface{}, options ...Option) *Parser {
 func Build(grammar interface{}, options ...Option) (parser *Parser, err error) {
 	// Configure Parser struct with defaults + options.
 	p := &Parser{
-		lex:             lexer.TextScannerLexer,
-		caseInsensitive: map[string]bool{},
-		useLookahead:    1,
+		lex:              lexer.TextScannerLexer,
+		caseInsensitive:  map[string]bool{},
+		interfaceParsers: map[reflect.Type]reflect.Value{},
+		useLookahead:     1,
 	}
 	for _, option := range options {
 		if err = option(p); err != nil {
@@ -82,7 +84,7 @@ func Build(grammar interface{}, options ...Option) (parser *Parser, err error) {
 		}}
 	}
 
-	context := newGeneratorContext(p.lex)
+	context := newGeneratorContext(p.lex, p.interfaceParsers)
 	v := reflect.ValueOf(grammar)
 	if v.Kind() == reflect.Interface {
 		v = v.Elem()

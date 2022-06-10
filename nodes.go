@@ -72,6 +72,23 @@ func (p *parseable) Parse(ctx *parseContext, parent reflect.Value) (out []reflec
 	return []reflect.Value{rv.Elem()}, nil
 }
 
+// @@ (where type is registered interface type)
+type iface struct {
+	typ     reflect.Type
+	parseFn reflect.Value
+}
+
+func (i *iface) String() string   { return "" }
+func (i *iface) GoString() string { return i.typ.Name() }
+
+func (i *iface) Parse(ctx *parseContext, parent reflect.Value) (out []reflect.Value, err error) {
+	returns := i.parseFn.Call([]reflect.Value{reflect.ValueOf(ctx.PeekingLexer)})
+	if err, ok := returns[1].Interface().(error); ok && err != nil {
+		return nil, err
+	}
+	return append(out, returns[0].Convert(i.typ)), nil
+}
+
 // @@
 type strct struct {
 	typ              reflect.Type
@@ -715,6 +732,12 @@ func setField(tokens []lexer.Token, strct reflect.Value, field structLexerField,
 			f.SetBool(fv.Bool())
 			break
 		}
+		if fv.Type() != f.Type() {
+			return fmt.Errorf("value %q is not correct type %s", fv, f.Type())
+		}
+		f.Set(fv)
+
+	case reflect.Interface:
 		if fv.Type() != f.Type() {
 			return fmt.Errorf("value %q is not correct type %s", fv, f.Type())
 		}

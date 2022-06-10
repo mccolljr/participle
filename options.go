@@ -1,6 +1,9 @@
 package participle
 
 import (
+	"fmt"
+	"reflect"
+
 	"github.com/alecthomas/participle/v2/lexer"
 )
 
@@ -37,6 +40,26 @@ func CaseInsensitive(tokens ...string) Option {
 		for _, token := range tokens {
 			p.caseInsensitive[token] = true
 		}
+		return nil
+	}
+}
+
+func UseInterface(parseFn interface{}) Option {
+	errType := reflect.TypeOf((*error)(nil)).Elem()
+	lexType := reflect.TypeOf((*lexer.PeekingLexer)(nil))
+	return func(parser *Parser) error {
+		fv := reflect.ValueOf(parseFn)
+		ft := fv.Type()
+		if ft.Kind() != reflect.Func {
+			return fmt.Errorf("parseFn must be a function (got %s)", ft)
+		}
+		if ft.NumIn() != 1 || ft.In(0) != lexType {
+			return fmt.Errorf("parseFn must only take one arg of type %s", lexType)
+		}
+		if ft.NumOut() != 2 || ft.Out(0).Kind() != reflect.Interface || ft.Out(1) != errType {
+			return fmt.Errorf("parseFn must return two values, the interface to produce & an error")
+		}
+		parser.interfaceParsers[ft.Out(0)] = fv
 		return nil
 	}
 }
